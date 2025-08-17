@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiService } from '../services/api';
 
 interface AlertSetupScreenProps {
   navigation: any;
@@ -18,6 +19,8 @@ interface AlertSetupScreenProps {
       arrival: string;
       date: string;
       time: string;
+      routeId: string;
+      scheduleId: string;
       user: {
         id: string;
         name: string;
@@ -28,7 +31,7 @@ interface AlertSetupScreenProps {
 }
 
 const AlertSetupScreen: React.FC<AlertSetupScreenProps> = ({ navigation, route }) => {
-  const { departure, arrival, date, time, user } = route.params;
+  const { departure, arrival, date, time, routeId, scheduleId, user } = route.params;
   const [targetSeats, setTargetSeats] = useState(1);
   const [pushNotification, setPushNotification] = useState(true);
   const [emailNotification, setEmailNotification] = useState(false);
@@ -38,8 +41,17 @@ const AlertSetupScreen: React.FC<AlertSetupScreenProps> = ({ navigation, route }
     setIsLoading(true);
     
     try {
-      // 실제로는 서버에 알림 설정을 저장
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 실제 서버에 알림 설정을 저장
+      const alertData = {
+        userId: user.id,
+        routeId,
+        scheduleId,
+        targetSeats,
+        pushNotification,
+        emailNotification,
+      };
+      
+      await apiService.createAlert(alertData);
       
       Alert.alert(
         '알림 설정 완료!',

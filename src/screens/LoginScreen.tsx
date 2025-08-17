@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiService } from '../services/api';
 
 interface LoginScreenProps {
   navigation: any;
@@ -17,21 +18,22 @@ interface LoginScreenProps {
       arrival: string;
       date: string;
       time: string;
+      routeId: string;
+      scheduleId: string;
     };
   };
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
-  const { departure, arrival, date, time } = route.params;
+  const { departure, arrival, date, time, routeId, scheduleId } = route.params;
   const [isLoading, setIsLoading] = useState(false);
 
   const handleKakaoLogin = async () => {
     setIsLoading(true);
     
     try {
-      // 실제 카카오 로그인 구현
-      // 여기서는 시뮬레이션을 위해 2초 대기
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 실제 카카오 로그인 구현 (현재는 시뮬레이션)
+      const user = await apiService.kakaoLogin('temp_access_token');
       
       // 로그인 성공 후 알림 설정 화면으로 이동
       navigation.navigate('AlertSetup', {
@@ -39,11 +41,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
         arrival,
         date,
         time,
-        user: {
-          id: 'user123',
-          name: '홍길동',
-          email: 'hong@example.com',
-        },
+        routeId,
+        scheduleId,
+        user,
       });
     } catch (error) {
       Alert.alert('로그인 실패', '카카오 로그인에 실패했습니다. 다시 시도해주세요.');

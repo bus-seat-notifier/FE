@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiService } from '../services/api';
+import { OperationItem } from '../types';
 
 interface TimeSelectionScreenProps {
   navigation: any;
@@ -16,39 +19,38 @@ interface TimeSelectionScreenProps {
       departure: string;
       arrival: string;
       date: string;
+      routeId: string;
     };
   };
 }
 
 const TimeSelectionScreen: React.FC<TimeSelectionScreenProps> = ({ navigation, route }) => {
-  const { departure, arrival, date } = route.params;
-  const [selectedTime, setSelectedTime] = useState('');
+  const { departure, arrival, date, routeId } = route.params;
+  const [selectedOperation, setSelectedOperation] = useState<OperationItem | null>(null);
+  const [operations, setOperations] = useState<OperationItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 시간대별 버스 스케줄 (실제로는 API에서 가져올 데이터)
-  const timeSlots = [
-    { time: '06:00', available: true, price: 15000 },
-    { time: '07:00', available: true, price: 15000 },
-    { time: '08:00', available: false, price: 15000 },
-    { time: '09:00', available: true, price: 15000 },
-    { time: '10:00', available: true, price: 15000 },
-    { time: '11:00', available: false, price: 15000 },
-    { time: '12:00', available: true, price: 15000 },
-    { time: '13:00', available: true, price: 15000 },
-    { time: '14:00', available: true, price: 15000 },
-    { time: '15:00', available: false, price: 15000 },
-    { time: '16:00', available: true, price: 15000 },
-    { time: '17:00', available: true, price: 15000 },
-    { time: '18:00', available: false, price: 15000 },
-    { time: '19:00', available: true, price: 15000 },
-    { time: '20:00', available: true, price: 15000 },
-    { time: '21:00', available: true, price: 15000 },
-    { time: '22:00', available: true, price: 15000 },
-    { time: '23:00', available: true, price: 15000 },
-  ];
+  useEffect(() => {
+    loadOperations();
+  }, []);
+
+  const loadOperations = async () => {
+    try {
+      setLoading(true);
+      const operationMap = await apiService.getOperationsByRoute(parseInt(routeId));
+      const dateOperations = operationMap[date] || [];
+      setOperations(dateOperations);
+    } catch (error) {
+      console.error('Error loading operations:', error);
+      Alert.alert('오류', '운행 정보를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleNext = () => {
-    if (!selectedTime) {
-      Alert.alert('알림', '시간을 선택해주세요.');
+    if (!selectedOperation) {
+      Alert.alert('알림', '운행 시간을 선택해주세요.');
       return;
     }
     
@@ -56,15 +58,30 @@ const TimeSelectionScreen: React.FC<TimeSelectionScreenProps> = ({ navigation, r
       departure,
       arrival,
       date,
-      time: selectedTime,
+      routeId,
+      operation: selectedOperation,
     });
   };
 
-  const selectTime = (time: string) => {
-    const timeSlot = timeSlots.find(slot => slot.time === time);
-    if (timeSlot && timeSlot.available) {
-      setSelectedTime(time);
-    }
+  const selectOperation = (operation: OperationItem) => {
+    setSelectedOperation(operation);
+  };
+
+  const formatTime = (timeString: string) => {
+    // "22:00:00" -> "22:00"
+    return timeString.substring(0, 5);
+  };
+
+  const formatPrice = (price: number) => {
+    return `₩${price.toLocaleString()}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+    return `${month}월 ${day}일 (${dayOfWeek})`;
   };
 
   return (
@@ -79,7 +96,7 @@ const TimeSelectionScreen: React.FC<TimeSelectionScreenProps> = ({ navigation, r
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>시간 선택</Text>
+        <Text style={styles.headerTitle}>운행 시간 선택</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -87,69 +104,130 @@ const TimeSelectionScreen: React.FC<TimeSelectionScreenProps> = ({ navigation, r
         <Text style={styles.routeText}>
           {departure} → {arrival}
         </Text>
-        <Text style={styles.dateText}>{date}</Text>
+        <Text style={styles.dateText}>{formatDate(date)}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>출발 시간을 선택하세요</Text>
-        
-        <View style={styles.timeGrid}>
-          {timeSlots.map((slot) => (
-            <TouchableOpacity
-              key={slot.time}
-              style={[
-                styles.timeButton,
-                selectedTime === slot.time && styles.selectedTimeButton,
-                !slot.available && styles.unavailableTimeButton,
-              ]}
-              onPress={() => selectTime(slot.time)}
-              disabled={!slot.available}
-            >
-              <Text
-                style={[
-                  styles.timeButtonText,
-                  selectedTime === slot.time && styles.selectedTimeButtonText,
-                  !slot.available && styles.unavailableTimeButtonText,
-                ]}
-              >
-                {slot.time}
-              </Text>
-              <Text
-                style={[
-                  styles.priceText,
-                  selectedTime === slot.time && styles.selectedPriceText,
-                  !slot.available && styles.unavailablePriceText,
-                ]}
-              >
-                {slot.available ? `₩${slot.price.toLocaleString()}` : '매진'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {selectedTime && (
-          <View style={styles.selectedInfo}>
-            <Text style={styles.selectedInfoText}>
-              선택된 시간: {selectedTime}
-            </Text>
-            <Text style={styles.selectedInfoText}>
-              가격: ₩{timeSlots.find(slot => slot.time === selectedTime)?.price.toLocaleString()}
-            </Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="white" />
+            <Text style={styles.loadingText}>운행 정보를 불러오는 중...</Text>
           </View>
-        )}
+        ) : operations.length === 0 ? (
+          <View style={styles.noDataContainer}>
+            <Text style={styles.noDataText}>해당 날짜에 운행 정보가 없습니다.</Text>
+            <Text style={styles.noDataSubText}>다른 날짜를 선택해보세요.</Text>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>운행 시간을 선택하세요</Text>
+            
+            <View style={styles.operationList}>
+              {operations.map((operation, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.operationCard,
+                    selectedOperation === operation && styles.selectedOperationCard,
+                  ]}
+                  onPress={() => selectOperation(operation)}
+                >
+                  <View style={styles.operationHeader}>
+                    <Text style={[
+                      styles.departureTime,
+                      selectedOperation === operation && styles.selectedText
+                    ]}>
+                      {formatTime(operation.departureTime)}
+                    </Text>
+                    <Text style={[
+                      styles.price,
+                      selectedOperation === operation && styles.selectedText
+                    ]}>
+                      {formatPrice(operation.price)}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.operationDetails}>
+                    <View style={styles.detailRow}>
+                      <Text style={[
+                        styles.detailLabel,
+                        selectedOperation === operation && styles.selectedText
+                      ]}>
+                        버스회사:
+                      </Text>
+                      <Text style={[
+                        styles.detailValue,
+                        selectedOperation === operation && styles.selectedText
+                      ]}>
+                        {operation.busCompany}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.detailRow}>
+                      <Text style={[
+                        styles.detailLabel,
+                        selectedOperation === operation && styles.selectedText
+                      ]}>
+                        버스타입:
+                      </Text>
+                      <Text style={[
+                        styles.detailValue,
+                        selectedOperation === operation && styles.selectedText
+                      ]}>
+                        {operation.busType}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.detailRow}>
+                      <Text style={[
+                        styles.detailLabel,
+                        selectedOperation === operation && styles.selectedText
+                      ]}>
+                        소요시간:
+                      </Text>
+                      <Text style={[
+                        styles.detailValue,
+                        selectedOperation === operation && styles.selectedText
+                      ]}>
+                        {operation.duration}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.nextButton,
-              !selectedTime && styles.disabledButton,
-            ]}
-            onPress={handleNext}
-            disabled={!selectedTime}
-          >
-            <Text style={styles.nextButtonText}>다음</Text>
-          </TouchableOpacity>
-        </View>
+            {selectedOperation && (
+              <View style={styles.selectedInfo}>
+                <Text style={styles.selectedInfoText}>
+                  선택된 시간: {formatTime(selectedOperation.departureTime)}
+                </Text>
+                <Text style={styles.selectedInfoText}>
+                  가격: {formatPrice(selectedOperation.price)}
+                </Text>
+                <Text style={styles.selectedInfoText}>
+                  버스: {selectedOperation.busCompany} {selectedOperation.busType}
+                </Text>
+                <Text style={styles.selectedInfoText}>
+                  소요시간: {selectedOperation.duration}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.nextButton,
+                  !selectedOperation && styles.disabledButton,
+                ]}
+                onPress={handleNext}
+                disabled={!selectedOperation}
+              >
+                <Text style={styles.nextButtonText}>다음</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </ScrollView>
     </LinearGradient>
   );
@@ -217,51 +295,57 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  timeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  operationList: {
+    marginBottom: 20,
   },
-  timeButton: {
+  operationCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: 15,
+    padding: 20,
     marginBottom: 15,
-    width: '48%',
-    alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  selectedTimeButton: {
+  selectedOperationCard: {
     backgroundColor: 'white',
     borderColor: '#667eea',
   },
-  unavailableTimeButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+  operationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
-  timeButtonText: {
-    color: 'white',
-    fontSize: 16,
+  departureTime: {
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 5,
+    color: 'white',
   },
-  selectedTimeButtonText: {
+  selectedText: {
     color: '#667eea',
   },
-  unavailableTimeButtonText: {
-    color: 'rgba(255, 255, 255, 0.5)',
+  price: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
   },
-  priceText: {
+  operationDetails: {
+    gap: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
+    fontWeight: '500',
   },
-  selectedPriceText: {
-    color: '#667eea',
-  },
-  unavailablePriceText: {
-    color: 'rgba(255, 255, 255, 0.3)',
+  detailValue: {
+    fontSize: 14,
+    color: 'white',
+    fontWeight: 'bold',
   },
   selectedInfo: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -300,6 +384,34 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#667eea',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: 'white',
+    marginTop: 15,
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  noDataSubText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
   },
 });
 

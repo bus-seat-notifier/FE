@@ -17,18 +17,23 @@ export type RootStackParamList = {
     departure: string;
     arrival: string;
     date: string;
+    routeId: string;
   };
   Login: {
     departure: string;
     arrival: string;
     date: string;
     time: string;
+    routeId: string;
+    scheduleId: string;
   };
   AlertSetup: {
     departure: string;
     arrival: string;
     date: string;
     time: string;
+    routeId: string;
+    scheduleId: string;
     user: {
       id: string;
       name: string;

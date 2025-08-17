@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiService, AlertResponse } from '../services/api';
 
 interface HomeScreenProps {
   navigation: any;
@@ -21,40 +24,77 @@ interface AlertItem {
   time: string;
   targetSeats: number;
   isActive: boolean;
+  routeId: string;
+  scheduleId: string;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  const [alerts, setAlerts] = useState<AlertItem[]>([
-    {
-      id: '1',
-      departure: '서울',
-      arrival: '부산',
-      date: '2024-01-15',
-      time: '14:00',
-      targetSeats: 2,
-      isActive: true,
-    },
-    {
-      id: '2',
-      departure: '대구',
-      arrival: '인천',
-      date: '2024-01-16',
-      time: '09:00',
-      targetSeats: 1,
-      isActive: true,
-    },
-  ]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const toggleAlert = (id: string) => {
-    setAlerts(prevAlerts =>
-      prevAlerts.map(alert =>
-        alert.id === id ? { ...alert, isActive: !alert.isActive } : alert
-      )
-    );
+  useEffect(() => {
+    loadUserAlerts();
+  }, []);
+
+  const loadUserAlerts = async () => {
+    try {
+      setLoading(true);
+      const userAlerts = await apiService.getUserAlerts('user123'); // 실제로는 로그인된 사용자 ID 사용
+      
+      // API 응답을 화면에 맞는 형태로 변환
+      const formattedAlerts: AlertItem[] = userAlerts.map(alert => ({
+        id: alert.id,
+        departure: '서울', // 실제로는 routeId로 노선 정보를 가져와야 함
+        arrival: '부산',
+        date: '2024-01-15',
+        time: '14:00',
+        targetSeats: alert.targetSeats,
+        isActive: alert.isActive,
+        routeId: alert.routeId,
+        scheduleId: alert.scheduleId,
+      }));
+      
+      setAlerts(formattedAlerts);
+    } catch (error) {
+      console.error('Error loading user alerts:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteAlert = (id: string) => {
-    setAlerts(prevAlerts => prevAlerts.filter(alert => alert.id !== id));
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadUserAlerts();
+    setRefreshing(false);
+  };
+
+  const toggleAlert = async (id: string) => {
+    try {
+      const alert = alerts.find(a => a.id === id);
+      if (!alert) return;
+
+      await apiService.updateAlertStatus(id, !alert.isActive);
+      
+      setAlerts(prevAlerts =>
+        prevAlerts.map(alert =>
+          alert.id === id ? { ...alert, isActive: !alert.isActive } : alert
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling alert:', error);
+      Alert.alert('오류', '알림 상태 변경에 실패했습니다.');
+    }
+  };
+
+  const deleteAlert = async (id: string) => {
+    try {
+      await apiService.deleteAlert(id);
+      setAlerts(prevAlerts => prevAlerts.filter(alert => alert.id !== id));
+    } catch (error) {
+      console.error('Error deleting alert:', error);
+      Alert.alert('오류', '알림 삭제에 실패했습니다.');
+    }
   };
 
   const renderAlertItem = ({ item }: { item: AlertItem }) => (
@@ -125,7 +165,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* 환영 메시지 */}
         <View style={styles.welcomeSection}>
           <Text style={styles.welcomeTitle}>안녕하세요! 👋</Text>
