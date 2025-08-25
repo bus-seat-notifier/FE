@@ -46,6 +46,7 @@ export const AREA_CODES: { [key: string]: string } = {
 };
 
 // 지역별로 터미널 그룹화하는 유틸리티 함수
+// TODO : 지역명 수정  필요요
 export const groupTerminalsByArea = (terminals: Terminal[]) => {
   const grouped: { [areaName: string]: Terminal[] } = {};
   
